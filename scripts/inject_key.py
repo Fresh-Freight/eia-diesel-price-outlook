@@ -15,8 +15,8 @@ HTML_PATH = Path(__file__).resolve().parent.parent / "docs" / "index.html"
 def main() -> int:
     api_key = os.environ.get("EIA_API_KEY", "").strip()
     if not api_key:
-        print("ERROR: EIA_API_KEY environment variable is empty or missing.", file=sys.stderr)
-        return 1
+        print("WARNING: EIA_API_KEY not set — deploying with fallback data only.")
+        return 0
 
     if not HTML_PATH.exists():
         print(f"ERROR: {HTML_PATH} not found.", file=sys.stderr)
