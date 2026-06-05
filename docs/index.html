@@ -492,6 +492,23 @@
   .animate-in {
     animation: fadeSlideUp 0.45s ease-out both;
   }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    .container { padding: 16px 14px 14px; border-radius: 0; }
+    h1 { font-size: 18px; }
+    .subtitle { font-size: 12px; }
+    .header-row { flex-direction: column; gap: 2px; }
+    .kpi-row { gap: 8px; }
+    .kpi { padding: 10px 12px; }
+    .kpi-label { font-size: 9px; }
+    .kpi-value { font-size: 22px; }
+    .kpi-sub { font-size: 10px; }
+    .legend-row { gap: 14px; flex-wrap: wrap; }
+    .legend-item { font-size: 11px; }
+    .chart-wrap { height: 220px; }
+    .footer-note { font-size: 10px; }
+  }
 </style>
 </head>
 <body>
