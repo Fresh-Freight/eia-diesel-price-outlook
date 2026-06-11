@@ -603,15 +603,11 @@ const PADD_LABELS = {
 };
 
 const FALLBACK_ACTUALS = [
-  {period:'2024-07-01',value:3.813},{period:'2024-07-29',value:3.768},{period:'2024-08-26',value:3.651},
-  {period:'2024-09-23',value:3.539},{period:'2024-10-21',value:3.553},{period:'2024-11-18',value:3.491},
-  {period:'2024-12-16',value:3.494},{period:'2025-01-13',value:3.602},{period:'2025-02-10',value:3.665},
-  {period:'2025-03-10',value:3.582},{period:'2025-04-07',value:3.639},{period:'2025-05-05',value:3.497},
-  {period:'2025-06-02',value:3.451},{period:'2025-06-30',value:3.727},{period:'2025-07-28',value:3.805},
-  {period:'2025-08-25',value:3.708},{period:'2025-09-22',value:3.749},{period:'2025-10-20',value:3.620},
-  {period:'2025-11-17',value:3.868},{period:'2025-12-15',value:3.607},{period:'2026-01-12',value:3.459},
-  {period:'2026-02-09',value:3.688},{period:'2026-03-09',value:4.859},{period:'2026-04-06',value:5.643},
-  {period:'2026-05-04',value:5.640},{period:'2026-06-01',value:5.350},{period:'2026-06-08',value:5.210}
+  {period:'2025-06',value:3.553},{period:'2025-07',value:3.790},{period:'2025-08',value:3.717},
+  {period:'2025-09',value:3.746},{period:'2025-10',value:3.616},{period:'2025-11',value:3.812},
+  {period:'2025-12',value:3.607},{period:'2026-01',value:3.477},{period:'2026-02',value:3.688},
+  {period:'2026-03',value:4.859},{period:'2026-04',value:5.597},{period:'2026-05',value:5.554},
+  {period:'2026-06',value:5.280}
 ];
 const FALLBACK_FORECAST = [
   {period:'2025-06',value:3.60},{period:'2025-07',value:3.78},{period:'2025-08',value:3.74},{period:'2025-09',value:3.75},
@@ -643,7 +639,7 @@ async function fetchActuals() {
     'facets[product][]': 'EPD2D',
     'facets[process][]': 'PTE',
     'facets[duoarea][]': ['NUS','R10','R20','R30','R40','R50','SCA'],
-    start: '2024-07-01',
+    start: '2025-06-01',
     'sort[0][column]': 'period',
     'sort[0][direction]': 'asc',
     length: '5000'
@@ -779,7 +775,7 @@ function initRangeSlider(mainChart, allLabels, actualData, forecastData) {
 
   function fmtLabel(idx) {
     const lbl = allLabels[Math.min(Math.max(Math.round(idx), 0), totalCount - 1)];
-    const d = new Date(lbl + 'T00:00:00');
+    const d = new Date(lbl + '-01T00:00:00');
     if (isNaN(d)) return lbl;
     return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
   }
@@ -889,6 +885,17 @@ async function init() {
   }
   nationalWeekly.sort((a,b) => a.period.localeCompare(b.period));
 
+  // Aggregate weekly actuals into monthly averages
+  const monthBuckets = {};
+  nationalWeekly.forEach(d => {
+    const m = d.period.slice(0, 7);
+    if (!monthBuckets[m]) monthBuckets[m] = [];
+    monthBuckets[m].push(d.value);
+  });
+  const nationalMonthly = Object.entries(monthBuckets)
+    .map(([m, vals]) => ({ period: m, value: vals.reduce((s,v) => s + v, 0) / vals.length }))
+    .sort((a,b) => a.period.localeCompare(b.period));
+
   let forecastMonthly;
   if (!usedFallback) {
     forecastMonthly = rawForecast
@@ -899,32 +906,34 @@ async function init() {
   }
   forecastMonthly.sort((a,b) => a.period.localeCompare(b.period));
 
-  const lastActualDate = nationalWeekly[nationalWeekly.length - 1]?.period || '';
-  const futureForecasts = forecastMonthly.filter(f => f.period > lastActualDate.slice(0,7) && f.period <= '2026-12');
+  const lastActualMonth = nationalMonthly[nationalMonthly.length - 1]?.period || '';
+  const futureForecasts = forecastMonthly.filter(f => f.period > lastActualMonth && f.period <= '2026-12');
   const fc2026 = forecastMonthly.filter(f => f.period.startsWith('2026'));
   const avg2026 = fc2026.length
     ? (fc2026.reduce((s,d) => s + d.value, 0) / fc2026.length)
     : null;
 
   // — KPIs —
-  const lastActual = nationalWeekly[nationalWeekly.length - 1];
-  document.getElementById('kpi-current').textContent = lastActual ? fmt(lastActual.value) : '—';
-  document.getElementById('kpi-current-date').textContent = lastActual
-    ? `Week of ${new Date(lastActual.period + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`
+  const lastActual = nationalMonthly[nationalMonthly.length - 1];
+  const lastWeekly = nationalWeekly[nationalWeekly.length - 1];
+  document.getElementById('kpi-current').textContent = lastWeekly ? fmt(lastWeekly.value) : '—';
+  document.getElementById('kpi-current-date').textContent = lastWeekly
+    ? `Week of ${new Date(lastWeekly.period + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}`
     : '';
   document.getElementById('kpi-forecast').textContent = avg2026 ? fmt(avg2026) : '—';
   document.getElementById('updated').textContent = new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
 
   // — Build combined labels & datasets —
   const allLabels = [
-    ...nationalWeekly.map(d => d.period),
-    ...futureForecasts.map(d => d.period + '-15')
+    ...nationalMonthly.map(d => d.period),
+    ...futureForecasts.map(d => d.period)
   ];
 
-  const actualData = nationalWeekly.map(d => d.value);
-  const forecastData = new Array(nationalWeekly.length).fill(null);
+  const actualData = nationalMonthly.map(d => d.value);
+  const forecastData = new Array(nationalMonthly.length).fill(null);
 
-  if (nationalWeekly.length > 0) {
+  // Connect forecast to the last actual point for a seamless handoff
+  if (nationalMonthly.length > 0) {
     forecastData[forecastData.length - 1] = lastActual.value;
   }
   futureForecasts.forEach(d => forecastData.push(d.value));
@@ -1000,8 +1009,8 @@ async function init() {
           callbacks: {
             title: items => {
               const lbl = items[0].label;
-              const d = new Date(lbl + 'T00:00:00');
-              return d.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+              const d = new Date(lbl + '-01T00:00:00');
+              return d.toLocaleDateString('en-US', {month:'long', year:'numeric'});
             },
             label: item => ` ${item.dataset.label}:  ${fmt(item.raw)}`
           }
@@ -1038,15 +1047,8 @@ async function init() {
             color: '#bbb',
             callback: function(value, index) {
               const lbl = this.getLabelForValue(value);
-              const d = new Date(lbl + 'T00:00:00');
+              const d = new Date(lbl + '-01T00:00:00');
               if (isNaN(d)) return lbl;
-              const ticks = this.chart.scales.x.ticks;
-              const visibleCount = ticks ? ticks.length : 0;
-              const first = ticks?.[0] ? new Date(this.getLabelForValue(ticks[0].value) + 'T00:00:00') : d;
-              const last = ticks?.[visibleCount - 1] ? new Date(this.getLabelForValue(ticks[visibleCount - 1].value) + 'T00:00:00') : d;
-              const spanDays = (last - first) / 86400000;
-              if (spanDays < 60) return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-              if (spanDays < 180) return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'2-digit'});
               return d.toLocaleDateString('en-US', {month:'short', year:'2-digit'});
             }
           },
